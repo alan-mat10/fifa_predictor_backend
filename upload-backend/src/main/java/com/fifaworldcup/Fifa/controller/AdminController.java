@@ -46,10 +46,11 @@ public class AdminController {
     @PostMapping("/pull-results")
     public ResponseEntity<String> pullResultsFromAPI() {
         // Find all matches that should have ended (kickoff 2+ hours ago) and are not completed
-        LocalDateTime twoHoursAgo = LocalDateTime.now().minusHours(2);
+        // Match times are stored in ET
+        LocalDateTime twoHoursAgoET = LocalDateTime.now(java.time.ZoneId.of("America/New_York")).minusHours(2);
         List<Match> pendingMatches = matchRepository.findAllByOrderByMatchDateTimeAsc().stream()
                 .filter(m -> m.getStatus() != Match.MatchStatus.COMPLETED)
-                .filter(m -> m.getMatchDateTime().isBefore(twoHoursAgo))
+                .filter(m -> m.getMatchDateTime().isBefore(twoHoursAgoET))
                 .toList();
 
         if (pendingMatches.isEmpty()) {

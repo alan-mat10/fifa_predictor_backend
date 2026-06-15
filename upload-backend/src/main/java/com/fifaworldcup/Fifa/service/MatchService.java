@@ -7,6 +7,8 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 
 import java.time.LocalDateTime;
+import java.time.ZoneId;
+import java.time.ZonedDateTime;
 import java.util.List;
 
 @Service
@@ -34,9 +36,13 @@ public class MatchService {
     }
 
     public List<MatchResponse> getTodaysMatches() {
-        LocalDateTime startOfDay = LocalDateTime.now().toLocalDate().atStartOfDay();
-        LocalDateTime endOfDay = startOfDay.plusDays(1);
-        return matchRepository.findByMatchDateTimeBetween(startOfDay, endOfDay).stream()
+        // Convert "today in IST" back to ET range for the DB query
+        LocalDateTime startOfDayIST = LocalDateTime.now(IST).toLocalDate().atStartOfDay();
+        LocalDateTime endOfDayIST = startOfDayIST.plusDays(1);
+        // Convert IST boundaries to ET for querying against stored ET times
+        LocalDateTime startET = startOfDayIST.atZone(IST).withZoneSameInstant(ET).toLocalDateTime();
+        LocalDateTime endET = endOfDayIST.atZone(IST).withZoneSameInstant(ET).toLocalDateTime();
+        return matchRepository.findByMatchDateTimeBetween(startET, endET).stream()
                 .map(this::toResponse)
                 .toList();
     }
@@ -47,7 +53,19 @@ public class MatchService {
         return toResponse(match);
     }
 
+    private static final ZoneId ET = ZoneId.of("America/New_York");
+    private static final ZoneId IST = ZoneId.of("Asia/Kolkata");
+
+    /**
+     * Converts stored match time (ET) to IST for the response.
+     */
+    private LocalDateTime toIST(LocalDateTime etTime) {
+        ZonedDateTime etZoned = etTime.atZone(ET);
+        return etZoned.withZoneSameInstant(IST).toLocalDateTime();
+    }
+
     private MatchResponse toResponse(Match match) {
+        LocalDateTime matchTimeIST = toIST(match.getMatchDateTime());
         return MatchResponse.builder()
                 .id(match.getId())
                 .team1Id(match.getTeam1().getId())
@@ -56,14 +74,14 @@ public class MatchService {
                 .team2Name(match.getTeam2().getName())
                 .team1Flag(match.getTeam1().getFlagUrl())
                 .team2Flag(match.getTeam2().getFlagUrl())
-                .matchDateTime(match.getMatchDateTime())
+                .matchDateTime(matchTimeIST)
                 .venue(match.getVenue())
                 .stage(match.getStage().name())
                 .group(match.getGroup())
                 .team1Score(match.getTeam1Score())
                 .team2Score(match.getTeam2Score())
                 .status(match.getStatus().name())
-                .predictionLocked(match.getMatchDateTime().isBefore(LocalDateTime.now()))
+                .predictionLocked(matchTimeIST.isBefore(LocalDateTime.now(IST)))
                 .build();
     }
 }

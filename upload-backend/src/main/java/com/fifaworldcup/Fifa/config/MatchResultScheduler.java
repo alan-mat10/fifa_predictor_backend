@@ -34,11 +34,14 @@ public class MatchResultScheduler {
     @Scheduled(fixedRate = 900000)  // 15 minutes in milliseconds
     public void checkForFinishedMatches() {
         // A match lasts ~90 min + halftime + injury time ≈ 2 hours
-        LocalDateTime twoHoursAgo = LocalDateTime.now().minusHours(2);
+        // Convert current IST time to ET for comparison with stored ET match times
+        LocalDateTime nowET = LocalDateTime.now(java.time.ZoneId.of("America/New_York"));
+        LocalDateTime twoHoursAgoET = nowET.minusHours(2);
 
-        // Find matches that should be finished (kicked off 2+ hours ago, still UPCOMING)
+        // Find matches that kicked off between 2 and 24 hours ago and are still not COMPLETED
+        // 24h window ensures missed matches get retried (e.g., after API outage or server restart)
         List<Match> matchesToCheck = matchRepository
-                .findByMatchDateTimeBetween(twoHoursAgo.minusHours(4), twoHoursAgo)
+                .findByMatchDateTimeBetween(twoHoursAgoET.minusHours(22), twoHoursAgoET)
                 .stream()
                 .filter(m -> m.getStatus() != Match.MatchStatus.COMPLETED)
                 .toList();
