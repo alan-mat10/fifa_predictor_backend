@@ -11,5 +11,6 @@ public interface GoalScorerPredictionRepository extends JpaRepository<GoalScorer
     List<GoalScorerPrediction> findByUserAndMatch(User user, Match match);
     List<GoalScorerPrediction> findByMatch(Match match);
     List<GoalScorerPrediction> findByMatchAndScored(Match match, boolean scored);
+    List<GoalScorerPrediction> findByUser(User user);
     void deleteByUserAndMatch(User user, Match match);
 }

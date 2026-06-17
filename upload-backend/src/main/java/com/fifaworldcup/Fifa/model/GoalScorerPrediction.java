@@ -35,6 +35,9 @@ public class GoalScorerPrediction {
     private boolean isFirstGoalScorer = false;  // true = predicting first goal, false = anytime scorer
 
     @Builder.Default
+    private int predictedGoals = 1;  // number of goals predicted for this player
+
+    @Builder.Default
     private int pointsEarned = 0;
 
     @Builder.Default

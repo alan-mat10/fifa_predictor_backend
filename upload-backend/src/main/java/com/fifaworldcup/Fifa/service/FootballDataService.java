@@ -36,11 +36,9 @@ public class FootballDataService {
     private static final String BASE_URL = "https://api.football-data.org/v4";
     private static final String WC_COMPETITION_CODE = "WC";
 
-    private static final int EXACT_SCORE_POINTS = 5;
-    private static final int CORRECT_RESULT_POINTS = 2;
-    private static final int CORRECT_GOAL_DIFF_POINTS = 1;
-    private static final int CORRECT_SCORER_POINTS = 3;
-    private static final int CORRECT_FIRST_SCORER_POINTS = 5;
+    private static final int MATCH_WINNER_POINTS = 1;       // Correct result (win/draw)
+    private static final int EXACT_SCORE_POINTS = 2;        // Exact score bonus (on top of match winner = +3 total)
+    private static final int GOAL_SCORER_POINTS = 2;        // Per correct goal scorer
 
     /**
      * Fetches results for a specific match from the API and updates the database.
@@ -147,7 +145,6 @@ public class FootballDataService {
     private void processGoalScorers(Match match, List<Map<String, Object>> goals) {
         // Save actual goal scorers to DB
         Set<String> scorerNames = new HashSet<>();
-        String firstScorerName = null;
         boolean isFirst = true;
 
         for (Map<String, Object> goal : goals) {
@@ -170,15 +167,31 @@ public class FootballDataService {
 
                 if (!"OWN".equalsIgnoreCase(type)) {
                     scorerNames.add(name.toLowerCase());
-                    if (firstScorerName == null) {
-                        firstScorerName = name.toLowerCase();
-                    }
                 }
                 isFirst = false;
             }
         }
 
         log.info("   Saved {} goal(s). Scorers: {}", goals.size(), scorerNames);
+
+        // Count actual goals per player name (for multi-goal multiplier)
+        java.util.Map<String, Integer> scorerGoalCounts = new java.util.HashMap<>();
+        for (String name : scorerNames) {
+            scorerGoalCounts.merge(name, 1, Integer::sum);
+        }
+        // Re-count properly from goals list (scorerNames is a Set, loses duplicates)
+        java.util.Map<String, Integer> actualGoalsByName = new java.util.HashMap<>();
+        for (Map<String, Object> goal : goals) {
+            @SuppressWarnings("unchecked")
+            Map<String, Object> scorer2 = (Map<String, Object>) goal.get("scorer");
+            if (scorer2 != null) {
+                String gName = (String) scorer2.get("name");
+                String gType = goal.get("type") != null ? (String) goal.get("type") : "REGULAR";
+                if (!"OWN".equalsIgnoreCase(gType)) {
+                    actualGoalsByName.merge(gName.toLowerCase(), 1, Integer::sum);
+                }
+            }
+        }
 
         // Now check goal scorer predictions
         List<GoalScorerPrediction> predictions = goalScorerPredictionRepository.findByMatchAndScored(match, false);
@@ -187,15 +200,19 @@ public class FootballDataService {
             int points = 0;
             String predictedPlayerName = prediction.getPlayer().getName().toLowerCase();
 
-            // Check if predicted player actually scored (fuzzy match)
-            if (scorerNames.stream().anyMatch(s -> namesMatch(predictedPlayerName, s))) {
-                points += CORRECT_SCORER_POINTS;
+            // Check if predicted player actually scored (fuzzy match) and get goal count
+            int actualGoals = 0;
+            for (Map.Entry<String, Integer> entry : actualGoalsByName.entrySet()) {
+                if (namesMatch(predictedPlayerName, entry.getKey())) {
+                    actualGoals = entry.getValue();
+                    break;
+                }
             }
 
-            // Check first goal scorer
-            if (prediction.isFirstGoalScorer() && firstScorerName != null
-                    && namesMatch(predictedPlayerName, firstScorerName)) {
-                points += CORRECT_FIRST_SCORER_POINTS;
+            if (actualGoals > 0) {
+                int predictedGoals = prediction.getPredictedGoals();
+                int goalsToReward = Math.min(actualGoals, predictedGoals);
+                points = GOAL_SCORER_POINTS * goalsToReward;
             }
 
             prediction.setPointsEarned(points);
@@ -222,17 +239,16 @@ public class FootballDataService {
 
             int points = 0;
 
-            if (predictedTeam1 == actualTeam1 && predictedTeam2 == actualTeam2) {
-                points = EXACT_SCORE_POINTS;
-            } else {
-                String actualResult = getResult(actualTeam1, actualTeam2);
-                String predictedResult = getResult(predictedTeam1, predictedTeam2);
-                if (actualResult.equals(predictedResult)) {
-                    int actualDiff = actualTeam1 - actualTeam2;
-                    int predictedDiff = predictedTeam1 - predictedTeam2;
-                    points = (actualDiff == predictedDiff)
-                            ? CORRECT_RESULT_POINTS + CORRECT_GOAL_DIFF_POINTS
-                            : CORRECT_RESULT_POINTS;
+            // Check result (win/draw)
+            String actualResult = getResult(actualTeam1, actualTeam2);
+            String predictedResult = getResult(predictedTeam1, predictedTeam2);
+
+            if (actualResult.equals(predictedResult)) {
+                points += MATCH_WINNER_POINTS;  // +1 for correct result
+
+                // Exact score bonus
+                if (predictedTeam1 == actualTeam1 && predictedTeam2 == actualTeam2) {
+                    points += EXACT_SCORE_POINTS;  // +2 for exact score (total +3)
                 }
             }
 

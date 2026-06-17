@@ -1,15 +1,12 @@
 package com.fifaworldcup.Fifa.service;
 
 import com.fifaworldcup.Fifa.dto.LeaderboardEntry;
-import com.fifaworldcup.Fifa.model.Prediction;
-import com.fifaworldcup.Fifa.model.User;
-import com.fifaworldcup.Fifa.repository.PredictionRepository;
-import com.fifaworldcup.Fifa.repository.UserRepository;
+import com.fifaworldcup.Fifa.model.*;
+import com.fifaworldcup.Fifa.repository.*;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 
-import java.util.ArrayList;
-import java.util.List;
+import java.util.*;
 
 @Service
 @RequiredArgsConstructor
@@ -17,6 +14,12 @@ public class LeaderboardService {
 
     private final UserRepository userRepository;
     private final PredictionRepository predictionRepository;
+    private final GoalScorerPredictionRepository goalScorerPredictionRepository;
+    private final MotmPredictionRepository motmPredictionRepository;
+    private final TopScorerPredictionRepository topScorerPredictionRepository;
+    private final GoldenBallPredictionRepository goldenBallPredictionRepository;
+    private final GoldenGlovePredictionRepository goldenGlovePredictionRepository;
+    private final WorldCupWinnerPredictionRepository worldCupWinnerPredictionRepository;
 
     public List<LeaderboardEntry> getLeaderboard() {
         List<User> users = userRepository.findAllByOrderByTotalPointsDesc();
@@ -44,5 +47,142 @@ public class LeaderboardService {
             ));
         }
         return leaderboard;
+    }
+
+    public Map<String, Object> getPointsBreakdown(String username) {
+        User user = userRepository.findByUsername(username)
+                .orElseThrow(() -> new RuntimeException("User not found"));
+
+        Map<String, Object> breakdown = new LinkedHashMap<>();
+        breakdown.put("username", user.getUsername());
+        breakdown.put("totalPoints", user.getTotalPoints());
+
+        // Match predictions breakdown
+        List<Prediction> predictions = predictionRepository.findByUser(user);
+        int matchResultPoints = 0;
+        int exactScorePoints = 0;
+        int matchResultCount = 0;
+        int exactScoreCount = 0;
+        List<Map<String, Object>> matchDetails = new ArrayList<>();
+
+        for (Prediction p : predictions) {
+            if (p.getPointsEarned() > 0) {
+                Map<String, Object> detail = new LinkedHashMap<>();
+                detail.put("match", p.getMatch().getTeam1().getName() + " vs " + p.getMatch().getTeam2().getName());
+                detail.put("predicted", p.getPredictedTeam1Score() + "-" + p.getPredictedTeam2Score());
+                detail.put("actual", p.getMatch().getTeam1Score() + "-" + p.getMatch().getTeam2Score());
+                detail.put("points", p.getPointsEarned());
+                if (p.getPointsEarned() == 3) {
+                    detail.put("type", "Exact Score");
+                    exactScorePoints += p.getPointsEarned();
+                    exactScoreCount++;
+                } else {
+                    detail.put("type", "Correct Result");
+                    matchResultPoints += p.getPointsEarned();
+                    matchResultCount++;
+                }
+                matchDetails.add(detail);
+            }
+        }
+
+        // Goal scorer predictions breakdown
+        List<GoalScorerPrediction> gsPredictions = goalScorerPredictionRepository.findByUser(user);
+        int goalScorerPoints = 0;
+        int goalScorerCount = 0;
+        List<Map<String, Object>> gsDetails = new ArrayList<>();
+
+        for (GoalScorerPrediction gs : gsPredictions) {
+            if (gs.getPointsEarned() > 0) {
+                Map<String, Object> detail = new LinkedHashMap<>();
+                detail.put("match", gs.getMatch().getTeam1().getName() + " vs " + gs.getMatch().getTeam2().getName());
+                detail.put("player", gs.getPlayer().getName());
+                detail.put("points", gs.getPointsEarned());
+                gsDetails.add(detail);
+                goalScorerPoints += gs.getPointsEarned();
+                goalScorerCount++;
+            }
+        }
+
+        // MOTM predictions breakdown
+        List<MotmPrediction> motmPredictions = motmPredictionRepository.findByUser(user);
+        int motmPoints = 0;
+        int motmCount = 0;
+        List<Map<String, Object>> motmDetails = new ArrayList<>();
+
+        for (MotmPrediction motm : motmPredictions) {
+            if (motm.getPointsEarned() > 0) {
+                Map<String, Object> detail = new LinkedHashMap<>();
+                detail.put("match", motm.getMatch().getTeam1().getName() + " vs " + motm.getMatch().getTeam2().getName());
+                detail.put("player", motm.getPlayer().getName());
+                detail.put("points", motm.getPointsEarned());
+                motmDetails.add(detail);
+                motmPoints += motm.getPointsEarned();
+                motmCount++;
+            }
+        }
+
+        // Tournament predictions
+        int tournamentPoints = 0;
+        List<Map<String, Object>> tournamentDetails = new ArrayList<>();
+
+        topScorerPredictionRepository.findByUser(user).ifPresent(p -> {
+            if (p.getPointsEarned() > 0) {
+                Map<String, Object> detail = new LinkedHashMap<>();
+                detail.put("type", "Golden Boot");
+                detail.put("prediction", p.getPlayerName());
+                detail.put("points", p.getPointsEarned());
+                tournamentDetails.add(detail);
+            }
+        });
+
+        goldenBallPredictionRepository.findByUser(user).ifPresent(p -> {
+            if (p.getPointsEarned() > 0) {
+                Map<String, Object> detail = new LinkedHashMap<>();
+                detail.put("type", "Golden Ball");
+                detail.put("prediction", p.getPlayerName());
+                detail.put("points", p.getPointsEarned());
+                tournamentDetails.add(detail);
+            }
+        });
+
+        goldenGlovePredictionRepository.findByUser(user).ifPresent(p -> {
+            if (p.getPointsEarned() > 0) {
+                Map<String, Object> detail = new LinkedHashMap<>();
+                detail.put("type", "Golden Glove");
+                detail.put("prediction", p.getPlayerName());
+                detail.put("points", p.getPointsEarned());
+                tournamentDetails.add(detail);
+            }
+        });
+
+        worldCupWinnerPredictionRepository.findByUser(user).ifPresent(p -> {
+            if (p.getPointsEarned() > 0) {
+                Map<String, Object> detail = new LinkedHashMap<>();
+                detail.put("type", "World Cup Winner");
+                detail.put("prediction", p.getTeam().getName());
+                detail.put("points", p.getPointsEarned());
+                tournamentDetails.add(detail);
+            }
+        });
+
+        for (Map<String, Object> td : tournamentDetails) {
+            tournamentPoints += (int) td.get("points");
+        }
+
+        // Summary
+        Map<String, Object> summary = new LinkedHashMap<>();
+        summary.put("matchResults", Map.of("points", matchResultPoints, "count", matchResultCount));
+        summary.put("exactScores", Map.of("points", exactScorePoints, "count", exactScoreCount));
+        summary.put("goalScorers", Map.of("points", goalScorerPoints, "count", goalScorerCount));
+        summary.put("motm", Map.of("points", motmPoints, "count", motmCount));
+        summary.put("tournament", Map.of("points", tournamentPoints, "count", tournamentDetails.size()));
+
+        breakdown.put("summary", summary);
+        breakdown.put("matchDetails", matchDetails);
+        breakdown.put("goalScorerDetails", gsDetails);
+        breakdown.put("motmDetails", motmDetails);
+        breakdown.put("tournamentDetails", tournamentDetails);
+
+        return breakdown;
     }
 }

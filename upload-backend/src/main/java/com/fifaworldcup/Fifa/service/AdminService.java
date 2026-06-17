@@ -8,7 +8,6 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.util.List;
-import java.util.Set;
 
 @Service
 @RequiredArgsConstructor
@@ -77,8 +76,11 @@ public class AdminService {
             throw new RuntimeException("Submit match result first before adding goal scorers");
         }
 
-        // Get actual scorer player IDs
-        Set<Long> actualScorerIds = new java.util.HashSet<>(request.getScorerPlayerIds());
+        // Get actual scorer player IDs and count occurrences (for multi-goal scoring)
+        java.util.Map<Long, Integer> actualGoalCounts = new java.util.HashMap<>();
+        for (Long scorerId : request.getScorerPlayerIds()) {
+            actualGoalCounts.merge(scorerId, 1, Integer::sum);
+        }
 
         List<GoalScorerPrediction> predictions = goalScorerPredictionRepository.findByMatchAndScored(match, false);
 
@@ -86,11 +88,13 @@ public class AdminService {
             int points = 0;
             Long predictedPlayerId = prediction.getPlayer().getId();
 
-            if (actualScorerIds.contains(predictedPlayerId)) {
-                points += GOAL_SCORER_POINTS;
+            if (actualGoalCounts.containsKey(predictedPlayerId)) {
+                int actualGoals = actualGoalCounts.get(predictedPlayerId);
+                int predictedGoals = prediction.getPredictedGoals();
+                // Award points multiplied by min(actual goals, predicted goals)
+                int goalsToReward = Math.min(actualGoals, predictedGoals);
+                points = GOAL_SCORER_POINTS * goalsToReward;
             }
-
-            // Check first goal scorer bonus is removed in new system — just base scorer points
 
             prediction.setPointsEarned(points);
             prediction.setScored(true);
@@ -162,6 +166,108 @@ public class AdminService {
         String lastA = partsA[partsA.length - 1];
         String lastB = partsB[partsB.length - 1];
         return lastA.equals(lastB) && lastA.length() > 3;
+    }
+
+    /**
+     * Returns all scored predictions for a user grouped by type, for admin editing.
+     */
+    public java.util.Map<String, Object> getUserPredictionsForAdmin(String username) {
+        User user = userRepository.findByUsername(username)
+                .orElseThrow(() -> new RuntimeException("User not found"));
+
+        java.util.Map<String, Object> result = new java.util.LinkedHashMap<>();
+        result.put("username", user.getUsername());
+        result.put("totalPoints", user.getTotalPoints());
+
+        // Match predictions
+        List<Prediction> predictions = predictionRepository.findByUser(user);
+        List<java.util.Map<String, Object>> matchPreds = new java.util.ArrayList<>();
+        for (Prediction p : predictions) {
+            if (p.isScored()) {
+                java.util.Map<String, Object> m = new java.util.LinkedHashMap<>();
+                m.put("id", p.getId());
+                m.put("match", p.getMatch().getTeam1().getName() + " vs " + p.getMatch().getTeam2().getName());
+                m.put("predicted", p.getPredictedTeam1Score() + "-" + p.getPredictedTeam2Score());
+                m.put("actual", p.getMatch().getTeam1Score() + "-" + p.getMatch().getTeam2Score());
+                m.put("points", p.getPointsEarned());
+                matchPreds.add(m);
+            }
+        }
+        result.put("matchPredictions", matchPreds);
+
+        // Goal scorer predictions
+        List<GoalScorerPrediction> gsPreds = goalScorerPredictionRepository.findByUser(user);
+        List<java.util.Map<String, Object>> gsList = new java.util.ArrayList<>();
+        for (GoalScorerPrediction gs : gsPreds) {
+            if (gs.isScored()) {
+                java.util.Map<String, Object> m = new java.util.LinkedHashMap<>();
+                m.put("id", gs.getId());
+                m.put("match", gs.getMatch().getTeam1().getName() + " vs " + gs.getMatch().getTeam2().getName());
+                m.put("player", gs.getPlayer().getName());
+                m.put("predictedGoals", gs.getPredictedGoals());
+                m.put("points", gs.getPointsEarned());
+                gsList.add(m);
+            }
+        }
+        result.put("goalScorerPredictions", gsList);
+
+        // MOTM predictions
+        List<MotmPrediction> motmPreds = motmPredictionRepository.findByUser(user);
+        List<java.util.Map<String, Object>> motmList = new java.util.ArrayList<>();
+        for (MotmPrediction mp : motmPreds) {
+            if (mp.isScored()) {
+                java.util.Map<String, Object> m = new java.util.LinkedHashMap<>();
+                m.put("id", mp.getId());
+                m.put("match", mp.getMatch().getTeam1().getName() + " vs " + mp.getMatch().getTeam2().getName());
+                m.put("player", mp.getPlayer().getName());
+                m.put("points", mp.getPointsEarned());
+                motmList.add(m);
+            }
+        }
+        result.put("motmPredictions", motmList);
+
+        return result;
+    }
+
+    /**
+     * Updates points on a specific prediction by type and ID.
+     * Also updates the user's total points accordingly.
+     */
+    @Transactional
+    public void updatePredictionPoints(String type, Long predictionId, int newPoints) {
+        switch (type) {
+            case "match" -> {
+                Prediction p = predictionRepository.findById(predictionId)
+                        .orElseThrow(() -> new RuntimeException("Prediction not found"));
+                int diff = newPoints - p.getPointsEarned();
+                p.setPointsEarned(newPoints);
+                predictionRepository.save(p);
+                User user = p.getUser();
+                user.setTotalPoints(user.getTotalPoints() + diff);
+                userRepository.save(user);
+            }
+            case "goalScorer" -> {
+                GoalScorerPrediction p = goalScorerPredictionRepository.findById(predictionId)
+                        .orElseThrow(() -> new RuntimeException("Goal scorer prediction not found"));
+                int diff = newPoints - p.getPointsEarned();
+                p.setPointsEarned(newPoints);
+                goalScorerPredictionRepository.save(p);
+                User user = p.getUser();
+                user.setTotalPoints(user.getTotalPoints() + diff);
+                userRepository.save(user);
+            }
+            case "motm" -> {
+                MotmPrediction p = motmPredictionRepository.findById(predictionId)
+                        .orElseThrow(() -> new RuntimeException("MOTM prediction not found"));
+                int diff = newPoints - p.getPointsEarned();
+                p.setPointsEarned(newPoints);
+                motmPredictionRepository.save(p);
+                User user = p.getUser();
+                user.setTotalPoints(user.getTotalPoints() + diff);
+                userRepository.save(user);
+            }
+            default -> throw new RuntimeException("Unknown prediction type: " + type);
+        }
     }
 
     /**

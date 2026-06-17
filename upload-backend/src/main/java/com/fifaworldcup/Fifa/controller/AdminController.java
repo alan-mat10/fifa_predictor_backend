@@ -132,6 +132,20 @@ public class AdminController {
         return ResponseEntity.ok(result);
     }
 
+    @GetMapping("/user-predictions/{username}")
+    public ResponseEntity<java.util.Map<String, Object>> getUserPredictions(@PathVariable String username) {
+        return ResponseEntity.ok(adminService.getUserPredictionsForAdmin(username));
+    }
+
+    @PostMapping("/update-prediction-points")
+    public ResponseEntity<String> updatePredictionPoints(
+            @RequestParam String type,
+            @RequestParam Long predictionId,
+            @RequestParam int points) {
+        adminService.updatePredictionPoints(type, predictionId, points);
+        return ResponseEntity.ok("Prediction points updated");
+    }
+
     @PostMapping("/award-top-scorer")
     public ResponseEntity<String> awardTopScorer(@RequestParam String playerName) {
         List<TopScorerPrediction> predictions = topScorerPredictionRepository.findAll();
