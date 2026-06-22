@@ -104,6 +104,12 @@ public class PredictionController {
         return ResponseEntity.ok("Man of the Match prediction saved");
     }
 
+    @GetMapping("/motm/match/{matchId}")
+    public ResponseEntity<List<java.util.Map<String, Object>>> getMotmPredictionsForMatch(
+            @PathVariable Long matchId) {
+        return ResponseEntity.ok(predictionService.getMotmPredictionsForMatch(matchId));
+    }
+
     @PostMapping("/world-cup-winner")
     public ResponseEntity<String> predictWorldCupWinner(
             @AuthenticationPrincipal UserDetails userDetails,

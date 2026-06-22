@@ -301,6 +301,27 @@ public class PredictionService {
 
     // ─── MOTM Prediction ──────────────────────────────────
 
+    public List<java.util.Map<String, Object>> getMotmPredictionsForMatch(Long matchId) {
+        Match match = matchRepository.findById(matchId)
+                .orElseThrow(() -> new RuntimeException("Match not found"));
+
+        // Only show all MOTM predictions after match is completed
+        if (match.getStatus() != Match.MatchStatus.COMPLETED) {
+            return List.of();
+        }
+
+        List<MotmPrediction> preds = motmPredictionRepository.findByMatchAndScored(match, true);
+        List<java.util.Map<String, Object>> result = new java.util.ArrayList<>();
+        for (MotmPrediction p : preds) {
+            java.util.Map<String, Object> m = new java.util.LinkedHashMap<>();
+            m.put("username", p.getUser().getUsername());
+            m.put("playerName", p.getPlayer().getName());
+            m.put("pointsEarned", p.getPointsEarned());
+            result.add(m);
+        }
+        return result;
+    }
+
     public void predictMotm(String username, Long matchId, Long playerId) {
         User user = userRepository.findByUsername(username)
                 .orElseThrow(() -> new RuntimeException("User not found"));

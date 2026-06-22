@@ -73,8 +73,11 @@ public class LeaderboardService {
                 detail.put("actual", p.getMatch().getTeam1Score() + "-" + p.getMatch().getTeam2Score());
                 detail.put("points", p.getPointsEarned());
                 if (p.getPointsEarned() == 3) {
-                    detail.put("type", "Exact Score");
-                    exactScorePoints += p.getPointsEarned();
+                    detail.put("type", "Exact Score (+1 Result +2 Exact)");
+                    // Exact score includes 1 for result + 2 for exact
+                    matchResultPoints += 1;
+                    matchResultCount++;
+                    exactScorePoints += 2;
                     exactScoreCount++;
                 } else {
                     detail.put("type", "Correct Result");
