@@ -109,6 +109,7 @@ public class PredictionService {
 
         // Remove existing goal scorer predictions for this user + match
         goalScorerPredictionRepository.deleteByUserAndMatch(user, match);
+        goalScorerPredictionRepository.flush();
 
         // Save new predictions
         for (Long playerId : request.getPlayerIds()) {
