@@ -27,9 +27,11 @@ public class Prediction {
     @JoinColumn(name = "match_id", nullable = false)
     private Match match;
 
-    private int predictedTeam1Score;
+    @Column(name = "predicted_team1_score")
+    private Integer predictedTeam1Score;
 
-    private int predictedTeam2Score;
+    @Column(name = "predicted_team2_score")
+    private Integer predictedTeam2Score;
 
     @Builder.Default
     private int pointsEarned = 0;
