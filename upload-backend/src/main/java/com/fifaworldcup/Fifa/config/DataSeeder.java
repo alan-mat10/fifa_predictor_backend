@@ -2,18 +2,10 @@ package com.fifaworldcup.Fifa.config;
 
 import com.fifaworldcup.Fifa.model.Match;
 import com.fifaworldcup.Fifa.model.MatchGoalScorer;
-import com.fifaworldcup.Fifa.model.GoalScorerPrediction;
-import com.fifaworldcup.Fifa.model.MotmPrediction;
-import com.fifaworldcup.Fifa.model.Player;
-import com.fifaworldcup.Fifa.model.Prediction;
 import com.fifaworldcup.Fifa.model.Team;
 import com.fifaworldcup.Fifa.model.User;
-import com.fifaworldcup.Fifa.repository.GoalScorerPredictionRepository;
 import com.fifaworldcup.Fifa.repository.MatchGoalScorerRepository;
 import com.fifaworldcup.Fifa.repository.MatchRepository;
-import com.fifaworldcup.Fifa.repository.MotmPredictionRepository;
-import com.fifaworldcup.Fifa.repository.PlayerRepository;
-import com.fifaworldcup.Fifa.repository.PredictionRepository;
 import com.fifaworldcup.Fifa.repository.TeamRepository;
 import com.fifaworldcup.Fifa.repository.UserRepository;
 import lombok.RequiredArgsConstructor;
@@ -33,10 +25,6 @@ public class DataSeeder implements CommandLineRunner {
     private final MatchRepository matchRepository;
     private final MatchGoalScorerRepository matchGoalScorerRepository;
     private final UserRepository userRepository;
-    private final PredictionRepository predictionRepository;
-    private final GoalScorerPredictionRepository goalScorerPredictionRepository;
-    private final MotmPredictionRepository motmPredictionRepository;
-    private final PlayerRepository playerRepository;
     private final PasswordEncoder passwordEncoder;
 
     @org.springframework.beans.factory.annotation.Value("${app.seed-data:true}")
@@ -344,77 +332,6 @@ public class DataSeeder implements CommandLineRunner {
 
         System.out.println("✅ Database seeded: 48 teams, 72 group + 16 R32 + 8 R16 matches, admin user created.");
         System.out.println("   Results loaded: Mexico 2-0 SA, S.Korea 2-1 Czechia | R32: Canada 1-0 South Africa");
-
-        // ============================================================
-        // TEST DATA: akshay predictions for completed matches
-        // ============================================================
-        User akshay = userRepository.save(User.builder()
-                .username("akshay")
-                .email("akshay@test.com")
-                .password(passwordEncoder.encode("akshay123"))
-                .role(User.Role.USER)
-                .build());
-
-        // Create test players for predictions (these will also be loaded by PlayerSeeder from CSV)
-        Player testPlayerMex1 = playerRepository.save(Player.builder()
-                .name("Julián Quiñones").team(mexico).position(Player.Position.FORWARD).build());
-        Player testPlayerMex2 = playerRepository.save(Player.builder()
-                .name("Raúl Jiménez").team(mexico).position(Player.Position.FORWARD).build());
-        Player testPlayerKor1 = playerRepository.save(Player.builder()
-                .name("Hwang In-beom").team(southKorea).position(Player.Position.MIDFIELDER).build());
-
-        // ── Match 1: Mexico 2-0 South Africa — ALL CORRECT ──
-        // Score: predicted 2-0, actual 2-0 → +3 (exact)
-        predictionRepository.save(Prediction.builder()
-                .user(akshay).match(mex_sa)
-                .predictedTeam1Score(2).predictedTeam2Score(0)
-                .pointsEarned(3).scored(true)
-                .build());
-
-        // Goal scorer: predicted Julián Quiñones (actually scored!) → +2
-        goalScorerPredictionRepository.save(GoalScorerPrediction.builder()
-                .user(akshay).match(mex_sa).player(testPlayerMex1)
-                .isFirstGoalScorer(true).predictedGoals(1)
-                .pointsEarned(2).scored(true)
-                .build());
-
-        // MOTM: predicted Julián Quiñones → +3 (correct)
-        mex_sa.setManOfTheMatch("Julián Quiñones");
-        matchRepository.save(mex_sa);
-        motmPredictionRepository.save(MotmPrediction.builder()
-                .user(akshay).match(mex_sa).player(testPlayerMex1)
-                .pointsEarned(3).scored(true)
-                .build());
-
-        // ── Match 2: South Korea 2-1 Czechia — ALL WRONG ──
-        // Score: predicted 0-1, actual 2-1 → 0 (wrong result)
-        predictionRepository.save(Prediction.builder()
-                .user(akshay).match(kor_cze)
-                .predictedTeam1Score(0).predictedTeam2Score(1)
-                .pointsEarned(0).scored(true)
-                .build());
-
-        // Goal scorer: predicted Hwang In-beom as first scorer, but he wasn't first → 0
-        // (he did score, but let's say we give 0 for testing "wrong" scenario)
-        goalScorerPredictionRepository.save(GoalScorerPrediction.builder()
-                .user(akshay).match(kor_cze).player(testPlayerKor1)
-                .isFirstGoalScorer(true).predictedGoals(1)
-                .pointsEarned(0).scored(true)
-                .build());
-
-        // MOTM: predicted Hwang In-beom but actual MOTM was different → 0
-        kor_cze.setManOfTheMatch("Oh Hyeon-gyu");
-        matchRepository.save(kor_cze);
-        motmPredictionRepository.save(MotmPrediction.builder()
-                .user(akshay).match(kor_cze).player(testPlayerKor1)
-                .pointsEarned(0).scored(true)
-                .build());
-
-        // Update akshay's total: 3 (score) + 2 (scorer) + 3 (motm) = 8 pts
-        akshay.setTotalPoints(8);
-        userRepository.save(akshay);
-
-        System.out.println("   Test data: akshay with 2 matches — Match 1: all correct (+8), Match 2: all wrong (0)");
     }
 
     private Team createTeam(String name, String group, String countryCode) {
