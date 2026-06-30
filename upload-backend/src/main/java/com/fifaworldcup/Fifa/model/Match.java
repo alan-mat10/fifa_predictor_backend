@@ -18,11 +18,11 @@ public class Match {
     private Long id;
 
     @ManyToOne
-    @JoinColumn(name = "team1_id", nullable = false)
+    @JoinColumn(name = "team1_id", nullable = true)
     private Team team1;
 
     @ManyToOne
-    @JoinColumn(name = "team2_id", nullable = false)
+    @JoinColumn(name = "team2_id", nullable = true)
     private Team team2;
 
     private LocalDateTime matchDateTime;
@@ -38,6 +38,10 @@ public class Match {
     private Integer team1Score;  // actual score (null until match ends)
 
     private Integer team2Score;  // actual score (null until match ends)
+
+    private Integer team1PenaltyScore;  // penalty shootout score (null if no shootout)
+
+    private Integer team2PenaltyScore;  // penalty shootout score (null if no shootout)
 
     private String manOfTheMatch;  // MOTM player name (set by admin after match)
 

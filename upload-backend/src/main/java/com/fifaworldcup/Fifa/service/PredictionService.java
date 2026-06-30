@@ -8,6 +8,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDateTime;
+import java.time.ZoneId;
 import java.util.List;
 
 @Service
@@ -33,7 +34,7 @@ public class PredictionService {
                 .orElseThrow(() -> new RuntimeException("Match not found"));
 
         // Check if prediction is locked (match has started)
-        if (match.getMatchDateTime().isBefore(LocalDateTime.now())) {
+        if (match.getMatchDateTime().isBefore(LocalDateTime.now(ZoneId.of("America/New_York")))) {
             throw new RuntimeException("Predictions are locked. Match has already started.");
         }
 
@@ -46,6 +47,7 @@ public class PredictionService {
 
         prediction.setPredictedTeam1Score(request.getPredictedTeam1Score());
         prediction.setPredictedTeam2Score(request.getPredictedTeam2Score());
+        prediction.setPenaltyWinnerTeamId(request.getPenaltyWinnerTeamId());
         prediction.setUpdatedAt(LocalDateTime.now());
 
         predictionRepository.save(prediction);
@@ -59,8 +61,51 @@ public class PredictionService {
         Match match = matchRepository.findById(request.getMatchId())
                 .orElseThrow(() -> new RuntimeException("Match not found"));
 
-        if (match.getMatchDateTime().isBefore(LocalDateTime.now())) {
+        if (match.getMatchDateTime().isBefore(LocalDateTime.now(ZoneId.of("America/New_York")))) {
             throw new RuntimeException("Predictions are locked. Match has already started.");
+        }
+
+        // Validate goal scorer count against predicted score
+        Prediction scorePrediction = predictionRepository.findByUserAndMatch(user, match)
+                .orElseThrow(() -> new RuntimeException("You must predict the score before picking goal scorers"));
+
+        int predictedTeam1Goals = scorePrediction.getPredictedTeam1Score();
+        int predictedTeam2Goals = scorePrediction.getPredictedTeam2Score();
+        int totalPredictedGoals = predictedTeam1Goals + predictedTeam2Goals;
+
+        // Calculate total goals from player goal counts
+        java.util.Map<Long, Integer> goalCounts = request.getPlayerGoalCounts() != null
+                ? request.getPlayerGoalCounts()
+                : new java.util.HashMap<>();
+
+        int totalPickedGoals = 0;
+        long team1GoalsPicked = 0;
+        long team2GoalsPicked = 0;
+
+        for (Long playerId : request.getPlayerIds()) {
+            Player player = playerRepository.findById(playerId)
+                    .orElseThrow(() -> new RuntimeException("Player not found: " + playerId));
+            int goalsForPlayer = goalCounts.getOrDefault(playerId, 1);
+            if (goalsForPlayer < 1) goalsForPlayer = 1;
+            totalPickedGoals += goalsForPlayer;
+            if (player.getTeam().getId().equals(match.getTeam1().getId())) {
+                team1GoalsPicked += goalsForPlayer;
+            } else {
+                team2GoalsPicked += goalsForPlayer;
+            }
+        }
+
+        if (totalPickedGoals > totalPredictedGoals) {
+            throw new RuntimeException("Total predicted goals by scorers (" + totalPickedGoals
+                    + ") cannot exceed total predicted score (" + totalPredictedGoals + ")");
+        }
+        if (team1GoalsPicked > predictedTeam1Goals) {
+            throw new RuntimeException(match.getTeam1().getName() + " goal scorer goals (" + team1GoalsPicked
+                    + ") cannot exceed predicted " + match.getTeam1().getName() + " goals (" + predictedTeam1Goals + ")");
+        }
+        if (team2GoalsPicked > predictedTeam2Goals) {
+            throw new RuntimeException(match.getTeam2().getName() + " goal scorer goals (" + team2GoalsPicked
+                    + ") cannot exceed predicted " + match.getTeam2().getName() + " goals (" + predictedTeam2Goals + ")");
         }
 
         // Remove existing goal scorer predictions for this user + match
@@ -73,12 +118,15 @@ public class PredictionService {
 
             boolean isFirst = request.getFirstGoalScorerPlayerId() != null
                     && request.getFirstGoalScorerPlayerId().equals(playerId);
+            int goalsForPlayer = goalCounts.getOrDefault(playerId, 1);
+            if (goalsForPlayer < 1) goalsForPlayer = 1;
 
             goalScorerPredictionRepository.save(GoalScorerPrediction.builder()
                     .user(user)
                     .match(match)
                     .player(player)
                     .isFirstGoalScorer(isFirst)
+                    .predictedGoals(goalsForPlayer)
                     .build());
         }
 
@@ -92,6 +140,7 @@ public class PredictionService {
                     .match(match)
                     .player(firstScorer)
                     .isFirstGoalScorer(true)
+                    .predictedGoals(1)
                     .build());
         }
 
@@ -155,13 +204,8 @@ public class PredictionService {
     }
 
     // Tournament predictions lock when tournament starts (June 11, 2026)
-    private static final LocalDateTime TOURNAMENT_START = LocalDateTime.of(2026, 6, 11, 0, 0);
-
-    private void checkTournamentPredictionLock() {
-        if (LocalDateTime.now().isAfter(TOURNAMENT_START)) {
-            throw new RuntimeException("Tournament predictions are locked. The World Cup has started.");
-        }
-    }
+    // Tournament prediction locking is now handled by TournamentSettingsService in the controller layer.
+    // No hardcoded lock needed here.
 
     public java.util.Map<String, Object> getMyTournamentPredictions(String username) {
         User user = userRepository.findByUsername(username)
@@ -185,13 +229,12 @@ public class PredictionService {
             result.put("worldCupWinner", java.util.Map.of("teamName", p.getTeam().getName(), "teamId", p.getTeam().getId()))
         );
 
-        result.put("locked", LocalDateTime.now().isAfter(TOURNAMENT_START));
+        result.put("locked", false); // Lock status is now checked via /tournament-lock-status endpoint
 
         return result;
     }
 
     public void predictTopScorer(String username, SpecialPredictionRequest request) {
-        checkTournamentPredictionLock();
         User user = userRepository.findByUsername(username)
                 .orElseThrow(() -> new RuntimeException("User not found"));
 
@@ -204,7 +247,6 @@ public class PredictionService {
     }
 
     public void predictGoldenBall(String username, SpecialPredictionRequest request) {
-        checkTournamentPredictionLock();
         User user = userRepository.findByUsername(username)
                 .orElseThrow(() -> new RuntimeException("User not found"));
 
@@ -226,6 +268,7 @@ public class PredictionService {
                 .team2Flag(prediction.getMatch().getTeam2().getFlagUrl())
                 .predictedTeam1Score(prediction.getPredictedTeam1Score())
                 .predictedTeam2Score(prediction.getPredictedTeam2Score())
+                .penaltyWinnerTeamId(prediction.getPenaltyWinnerTeamId())
                 .actualTeam1Score(prediction.getMatch().getTeam1Score())
                 .actualTeam2Score(prediction.getMatch().getTeam2Score())
                 .pointsEarned(prediction.getPointsEarned())
@@ -244,6 +287,7 @@ public class PredictionService {
                 .playerName(gsp.getPlayer().getName())
                 .playerTeam(gsp.getPlayer().getTeam().getName())
                 .firstGoalScorer(gsp.isFirstGoalScorer())
+                .predictedGoals(gsp.getPredictedGoals())
                 .pointsEarned(gsp.getPointsEarned())
                 .matchStatus(gsp.getMatch().getStatus().name())
                 .username(gsp.getUser().getUsername())
@@ -251,6 +295,27 @@ public class PredictionService {
     }
 
     // ─── MOTM Prediction ──────────────────────────────────
+
+    public List<java.util.Map<String, Object>> getMotmPredictionsForMatch(Long matchId) {
+        Match match = matchRepository.findById(matchId)
+                .orElseThrow(() -> new RuntimeException("Match not found"));
+
+        // Only show all MOTM predictions after match is completed
+        if (match.getStatus() != Match.MatchStatus.COMPLETED) {
+            return List.of();
+        }
+
+        List<MotmPrediction> preds = motmPredictionRepository.findByMatchAndScored(match, true);
+        List<java.util.Map<String, Object>> result = new java.util.ArrayList<>();
+        for (MotmPrediction p : preds) {
+            java.util.Map<String, Object> m = new java.util.LinkedHashMap<>();
+            m.put("username", p.getUser().getUsername());
+            m.put("playerName", p.getPlayer().getName());
+            m.put("pointsEarned", p.getPointsEarned());
+            result.add(m);
+        }
+        return result;
+    }
 
     public void predictMotm(String username, Long matchId, Long playerId) {
         User user = userRepository.findByUsername(username)
@@ -260,7 +325,7 @@ public class PredictionService {
         Player player = playerRepository.findById(playerId)
                 .orElseThrow(() -> new RuntimeException("Player not found"));
 
-        if (match.getMatchDateTime().isBefore(LocalDateTime.now())) {
+        if (match.getMatchDateTime().isBefore(LocalDateTime.now(ZoneId.of("America/New_York")))) {
             throw new RuntimeException("Predictions are locked. Match has already started.");
         }
 
@@ -272,18 +337,13 @@ public class PredictionService {
 
     // ─── World Cup Winner Prediction ──────────────────────
 
-    private static final LocalDateTime GROUP_STAGE_END = LocalDateTime.of(2026, 6, 27, 23, 59);
+    // World Cup Winner lock is now handled by TournamentSettingsService in the controller layer.
 
     public void predictWorldCupWinner(String username, Long teamId) {
         User user = userRepository.findByUsername(username)
                 .orElseThrow(() -> new RuntimeException("User not found"));
         Team team = teamRepository.findById(teamId)
                 .orElseThrow(() -> new RuntimeException("Team not found"));
-
-        // Check if group stage is over
-        if (LocalDateTime.now().isAfter(GROUP_STAGE_END)) {
-            throw new RuntimeException("World Cup Winner prediction is locked after group stage ends (June 27).");
-        }
 
         WorldCupWinnerPrediction prediction = worldCupWinnerPredictionRepository.findByUser(user)
                 .orElse(WorldCupWinnerPrediction.builder().user(user).build());
@@ -294,7 +354,6 @@ public class PredictionService {
     // ─── Golden Glove Prediction ──────────────────────────
 
     public void predictGoldenGlove(String username, SpecialPredictionRequest request) {
-        checkTournamentPredictionLock();
         User user = userRepository.findByUsername(username)
                 .orElseThrow(() -> new RuntimeException("User not found"));
 

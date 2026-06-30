@@ -14,6 +14,7 @@ public class GoalScorerPredictionResponse {
     private String playerName;
     private String playerTeam;
     private boolean firstGoalScorer;
+    private int predictedGoals;
     private int pointsEarned;
     private String matchStatus;
     private String username;

@@ -14,6 +14,7 @@ public class PredictionResponse {
     private String team2Flag;
     private int predictedTeam1Score;
     private int predictedTeam2Score;
+    private Long penaltyWinnerTeamId;
     private Integer actualTeam1Score;
     private Integer actualTeam2Score;
     private int pointsEarned;

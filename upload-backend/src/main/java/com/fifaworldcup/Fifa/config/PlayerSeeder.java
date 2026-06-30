@@ -44,7 +44,7 @@ public class PlayerSeeder implements CommandLineRunner {
     @Override
     public void run(String... args) {
         if (!seedData) return;
-        if (playerRepository.count() > 0) return;
+        if (playerRepository.count() > 10) return;  // Only skip if full CSV already loaded
 
         try {
             ClassPathResource resource = new ClassPathResource("FIFA_World_Cup_2026_Squads)_new.csv");

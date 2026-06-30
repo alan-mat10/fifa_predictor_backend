@@ -2,10 +2,18 @@ package com.fifaworldcup.Fifa.config;
 
 import com.fifaworldcup.Fifa.model.Match;
 import com.fifaworldcup.Fifa.model.MatchGoalScorer;
+import com.fifaworldcup.Fifa.model.GoalScorerPrediction;
+import com.fifaworldcup.Fifa.model.MotmPrediction;
+import com.fifaworldcup.Fifa.model.Player;
+import com.fifaworldcup.Fifa.model.Prediction;
 import com.fifaworldcup.Fifa.model.Team;
 import com.fifaworldcup.Fifa.model.User;
+import com.fifaworldcup.Fifa.repository.GoalScorerPredictionRepository;
 import com.fifaworldcup.Fifa.repository.MatchGoalScorerRepository;
 import com.fifaworldcup.Fifa.repository.MatchRepository;
+import com.fifaworldcup.Fifa.repository.MotmPredictionRepository;
+import com.fifaworldcup.Fifa.repository.PlayerRepository;
+import com.fifaworldcup.Fifa.repository.PredictionRepository;
 import com.fifaworldcup.Fifa.repository.TeamRepository;
 import com.fifaworldcup.Fifa.repository.UserRepository;
 import lombok.RequiredArgsConstructor;
@@ -25,6 +33,10 @@ public class DataSeeder implements CommandLineRunner {
     private final MatchRepository matchRepository;
     private final MatchGoalScorerRepository matchGoalScorerRepository;
     private final UserRepository userRepository;
+    private final PredictionRepository predictionRepository;
+    private final GoalScorerPredictionRepository goalScorerPredictionRepository;
+    private final MotmPredictionRepository motmPredictionRepository;
+    private final PlayerRepository playerRepository;
     private final PasswordEncoder passwordEncoder;
 
     @org.springframework.beans.factory.annotation.Value("${app.seed-data:true}")
@@ -243,8 +255,166 @@ public class DataSeeder implements CommandLineRunner {
         createMatch(algeria, austria, "2026-06-27T22:00", "Kansas City Stadium (Arrowhead)", "J");
         createMatch(jordan, argentina, "2026-06-27T22:00", "Dallas Stadium (AT&T)", "J");
 
-        System.out.println("✅ Database seeded: 48 teams, 72 group stage matches, admin user created.");
-        System.out.println("   Results loaded: Mexico 2-0 South Africa, South Korea 2-1 Czechia");
+        // ============================================================
+        // ROUND OF 32 (June 28 - July 3) — All times ET
+        // ============================================================
+
+        // Match 73 - June 28 (COMPLETED: Canada 1-0 South Africa)
+        Match m73 = createCompletedKnockoutMatch(southAfrica, canada, "2026-06-28T12:00", "Los Angeles Stadium (SoFi)", Match.Stage.ROUND_OF_32, 0, 1);
+
+        // Match 74 - June 29
+        createKnockoutMatch(brazil, japan, "2026-06-29T13:00", "Houston Stadium (NRG)", Match.Stage.ROUND_OF_32);
+
+        // Match 75 - June 29
+        createKnockoutMatch(germany, paraguay, "2026-06-29T16:30", "Boston Stadium (Gillette)", Match.Stage.ROUND_OF_32);
+
+        // Match 76 - June 29
+        createKnockoutMatch(netherlands, morocco, "2026-06-29T21:00", "Monterrey Stadium (Estadio BBVA)", Match.Stage.ROUND_OF_32);
+
+        // Match 77 - June 30
+        createKnockoutMatch(france, sweden, "2026-06-30T17:00", "New York New Jersey Stadium (MetLife)", Match.Stage.ROUND_OF_32);
+
+        // Match 78 - June 30
+        createKnockoutMatch(ivoryCoast, norway, "2026-06-30T13:00", "Dallas Stadium (AT&T)", Match.Stage.ROUND_OF_32);
+
+        // Match 79 - June 30
+        createKnockoutMatch(mexico, ecuador, "2026-06-30T21:00", "Mexico City Stadium (Estadio Azteca)", Match.Stage.ROUND_OF_32);
+
+        // Match 80 - July 1
+        createKnockoutMatch(england, drCongo, "2026-07-01T12:00", "Atlanta Stadium (Mercedes-Benz)", Match.Stage.ROUND_OF_32);
+
+        // Match 81 - July 1
+        createKnockoutMatch(usa, bosnia, "2026-07-01T20:00", "San Francisco Bay Area Stadium (Levi's)", Match.Stage.ROUND_OF_32);
+
+        // Match 82 - July 1
+        createKnockoutMatch(belgium, senegal, "2026-07-01T16:00", "Seattle Stadium (Lumen Field)", Match.Stage.ROUND_OF_32);
+
+        // Match 83 - July 2
+        createKnockoutMatch(spain, austria, "2026-07-02T15:00", "Los Angeles Stadium (SoFi)", Match.Stage.ROUND_OF_32);
+
+        // Match 84 - July 2
+        createKnockoutMatch(portugal, croatia, "2026-07-02T19:00", "Toronto Stadium (BMO Field)", Match.Stage.ROUND_OF_32);
+
+        // Match 85 - July 2
+        createKnockoutMatch(switzerland, algeria, "2026-07-02T23:00", "BC Place, Vancouver", Match.Stage.ROUND_OF_32);
+
+        // Match 86 - July 3
+        createKnockoutMatch(australia, egypt, "2026-07-03T14:00", "Dallas Stadium (AT&T)", Match.Stage.ROUND_OF_32);
+
+        // Match 87 - July 3
+        createKnockoutMatch(argentina, capeVerde, "2026-07-03T18:00", "Miami Stadium (Hard Rock)", Match.Stage.ROUND_OF_32);
+
+        // Match 88 - July 3
+        createKnockoutMatch(colombia, ghana, "2026-07-03T21:30", "Kansas City Stadium (Arrowhead)", Match.Stage.ROUND_OF_32);
+
+        // ============================================================
+        // ROUND OF 16 (July 4 - July 7) — Placeholder matches
+        // ============================================================
+
+        // Match 89 - July 4: Winner M75 vs Winner M77
+        createPlaceholderMatch("2026-07-04T16:00", "Philadelphia Stadium (Lincoln Financial)", Match.Stage.ROUND_OF_16);
+
+        // Match 90 - July 4: Winner M73 (Canada) vs Winner M76
+        // Since M73 is completed, Canada is already placed as team1
+        matchRepository.save(Match.builder()
+                .team1(canada)
+                .matchDateTime(LocalDateTime.parse("2026-07-04T20:00"))
+                .venue("Houston Stadium (NRG)")
+                .stage(Match.Stage.ROUND_OF_16)
+                .status(Match.MatchStatus.UPCOMING)
+                .build());
+
+        // Match 91 - July 5: Winner M74 vs Winner M78
+        createPlaceholderMatch("2026-07-05T17:00", "New York New Jersey Stadium (MetLife)", Match.Stage.ROUND_OF_16);
+
+        // Match 92 - July 5: Winner M79 vs Winner M80
+        createPlaceholderMatch("2026-07-05T21:00", "Mexico City Stadium (Estadio Azteca)", Match.Stage.ROUND_OF_16);
+
+        // Match 93 - July 6: Winner M84 vs Winner M83
+        createPlaceholderMatch("2026-07-06T16:00", "Dallas Stadium (AT&T)", Match.Stage.ROUND_OF_16);
+
+        // Match 94 - July 6: Winner M81 vs Winner M82
+        createPlaceholderMatch("2026-07-06T20:00", "Seattle Stadium (Lumen Field)", Match.Stage.ROUND_OF_16);
+
+        // Match 95 - July 7: Winner M87 vs Winner M86
+        createPlaceholderMatch("2026-07-07T17:00", "Atlanta Stadium (Mercedes-Benz)", Match.Stage.ROUND_OF_16);
+
+        // Match 96 - July 7: Winner M85 vs Winner M88
+        createPlaceholderMatch("2026-07-07T21:00", "BC Place, Vancouver", Match.Stage.ROUND_OF_16);
+
+        System.out.println("✅ Database seeded: 48 teams, 72 group + 16 R32 + 8 R16 matches, admin user created.");
+        System.out.println("   Results loaded: Mexico 2-0 SA, S.Korea 2-1 Czechia | R32: Canada 1-0 South Africa");
+
+        // ============================================================
+        // TEST DATA: akshay predictions for completed matches
+        // ============================================================
+        User akshay = userRepository.save(User.builder()
+                .username("akshay")
+                .email("akshay@test.com")
+                .password(passwordEncoder.encode("akshay123"))
+                .role(User.Role.USER)
+                .build());
+
+        // Create test players for predictions (these will also be loaded by PlayerSeeder from CSV)
+        Player testPlayerMex1 = playerRepository.save(Player.builder()
+                .name("Julián Quiñones").team(mexico).position(Player.Position.FORWARD).build());
+        Player testPlayerMex2 = playerRepository.save(Player.builder()
+                .name("Raúl Jiménez").team(mexico).position(Player.Position.FORWARD).build());
+        Player testPlayerKor1 = playerRepository.save(Player.builder()
+                .name("Hwang In-beom").team(southKorea).position(Player.Position.MIDFIELDER).build());
+
+        // ── Match 1: Mexico 2-0 South Africa — ALL CORRECT ──
+        // Score: predicted 2-0, actual 2-0 → +3 (exact)
+        predictionRepository.save(Prediction.builder()
+                .user(akshay).match(mex_sa)
+                .predictedTeam1Score(2).predictedTeam2Score(0)
+                .pointsEarned(3).scored(true)
+                .build());
+
+        // Goal scorer: predicted Julián Quiñones (actually scored!) → +2
+        goalScorerPredictionRepository.save(GoalScorerPrediction.builder()
+                .user(akshay).match(mex_sa).player(testPlayerMex1)
+                .isFirstGoalScorer(true).predictedGoals(1)
+                .pointsEarned(2).scored(true)
+                .build());
+
+        // MOTM: predicted Julián Quiñones → +3 (correct)
+        mex_sa.setManOfTheMatch("Julián Quiñones");
+        matchRepository.save(mex_sa);
+        motmPredictionRepository.save(MotmPrediction.builder()
+                .user(akshay).match(mex_sa).player(testPlayerMex1)
+                .pointsEarned(3).scored(true)
+                .build());
+
+        // ── Match 2: South Korea 2-1 Czechia — ALL WRONG ──
+        // Score: predicted 0-1, actual 2-1 → 0 (wrong result)
+        predictionRepository.save(Prediction.builder()
+                .user(akshay).match(kor_cze)
+                .predictedTeam1Score(0).predictedTeam2Score(1)
+                .pointsEarned(0).scored(true)
+                .build());
+
+        // Goal scorer: predicted Hwang In-beom as first scorer, but he wasn't first → 0
+        // (he did score, but let's say we give 0 for testing "wrong" scenario)
+        goalScorerPredictionRepository.save(GoalScorerPrediction.builder()
+                .user(akshay).match(kor_cze).player(testPlayerKor1)
+                .isFirstGoalScorer(true).predictedGoals(1)
+                .pointsEarned(0).scored(true)
+                .build());
+
+        // MOTM: predicted Hwang In-beom but actual MOTM was different → 0
+        kor_cze.setManOfTheMatch("Oh Hyeon-gyu");
+        matchRepository.save(kor_cze);
+        motmPredictionRepository.save(MotmPrediction.builder()
+                .user(akshay).match(kor_cze).player(testPlayerKor1)
+                .pointsEarned(0).scored(true)
+                .build());
+
+        // Update akshay's total: 3 (score) + 2 (scorer) + 3 (motm) = 8 pts
+        akshay.setTotalPoints(8);
+        userRepository.save(akshay);
+
+        System.out.println("   Test data: akshay with 2 matches — Match 1: all correct (+8), Match 2: all wrong (0)");
     }
 
     private Team createTeam(String name, String group, String countryCode) {
@@ -278,6 +448,39 @@ public class DataSeeder implements CommandLineRunner {
                 .team1Score(score1)
                 .team2Score(score2)
                 .status(Match.MatchStatus.COMPLETED)
+                .build());
+    }
+
+    private Match createKnockoutMatch(Team team1, Team team2, String dateTime, String venue, Match.Stage stage) {
+        return matchRepository.save(Match.builder()
+                .team1(team1)
+                .team2(team2)
+                .matchDateTime(LocalDateTime.parse(dateTime))
+                .venue(venue)
+                .stage(stage)
+                .status(Match.MatchStatus.UPCOMING)
+                .build());
+    }
+
+    private Match createCompletedKnockoutMatch(Team team1, Team team2, String dateTime, String venue, Match.Stage stage, int score1, int score2) {
+        return matchRepository.save(Match.builder()
+                .team1(team1)
+                .team2(team2)
+                .matchDateTime(LocalDateTime.parse(dateTime))
+                .venue(venue)
+                .stage(stage)
+                .team1Score(score1)
+                .team2Score(score2)
+                .status(Match.MatchStatus.COMPLETED)
+                .build());
+    }
+
+    private Match createPlaceholderMatch(String dateTime, String venue, Match.Stage stage) {
+        return matchRepository.save(Match.builder()
+                .matchDateTime(LocalDateTime.parse(dateTime))
+                .venue(venue)
+                .stage(stage)
+                .status(Match.MatchStatus.UPCOMING)
                 .build());
     }
 

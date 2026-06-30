@@ -37,6 +37,7 @@ public class AdminController {
     private final GoldenGlovePredictionRepository goldenGlovePredictionRepository;
     private final WorldCupWinnerPredictionRepository worldCupWinnerPredictionRepository;
     private final UserRepository userRepository;
+    private final com.fifaworldcup.Fifa.service.TournamentSettingsService tournamentSettingsService;
 
     private static final int TOP_SCORER_BONUS = 4;
     private static final int GOLDEN_BALL_BONUS = 4;
@@ -46,10 +47,11 @@ public class AdminController {
     @PostMapping("/pull-results")
     public ResponseEntity<String> pullResultsFromAPI() {
         // Find all matches that should have ended (kickoff 2+ hours ago) and are not completed
-        LocalDateTime twoHoursAgo = LocalDateTime.now().minusHours(2);
+        // Match times are stored in ET
+        LocalDateTime twoHoursAgoET = LocalDateTime.now(java.time.ZoneId.of("America/New_York")).minusHours(2);
         List<Match> pendingMatches = matchRepository.findAllByOrderByMatchDateTimeAsc().stream()
                 .filter(m -> m.getStatus() != Match.MatchStatus.COMPLETED)
-                .filter(m -> m.getMatchDateTime().isBefore(twoHoursAgo))
+                .filter(m -> m.getMatchDateTime().isBefore(twoHoursAgoET))
                 .toList();
 
         if (pendingMatches.isEmpty()) {
@@ -129,6 +131,20 @@ public class AdminController {
     public ResponseEntity<String> recalculateAllPoints() {
         String result = adminService.recalculateAllPoints();
         return ResponseEntity.ok(result);
+    }
+
+    @GetMapping("/user-predictions/{username}")
+    public ResponseEntity<java.util.Map<String, Object>> getUserPredictions(@PathVariable String username) {
+        return ResponseEntity.ok(adminService.getUserPredictionsForAdmin(username));
+    }
+
+    @PostMapping("/update-prediction-points")
+    public ResponseEntity<String> updatePredictionPoints(
+            @RequestParam String type,
+            @RequestParam Long predictionId,
+            @RequestParam int points) {
+        adminService.updatePredictionPoints(type, predictionId, points);
+        return ResponseEntity.ok("Prediction points updated");
     }
 
     @PostMapping("/award-top-scorer")
@@ -283,5 +299,39 @@ public class AdminController {
                 .createdAt(code.getCreatedAt())
                 .usedAt(code.getUsedAt())
                 .build();
+    }
+
+    // ─── Tournament Prediction Lock Settings ───────────────────────────
+
+    @GetMapping("/tournament-settings")
+    public ResponseEntity<?> getTournamentSettings() {
+        var settings = tournamentSettingsService.getSettings();
+        return ResponseEntity.ok(java.util.Map.of(
+                "tournamentPredictionLockTime", settings.getTournamentPredictionLockTime() != null ? settings.getTournamentPredictionLockTime().toString() : "",
+                "tournamentPredictionsLocked", settings.isTournamentPredictionsLocked(),
+                "isCurrentlyLocked", tournamentSettingsService.areTournamentPredictionsLocked()
+        ));
+    }
+
+    @PostMapping("/tournament-settings/set-lock-time")
+    public ResponseEntity<?> setTournamentLockTime(@RequestParam String lockTime) {
+        LocalDateTime parsedTime = LocalDateTime.parse(lockTime);
+        var settings = tournamentSettingsService.setLockTime(parsedTime);
+        return ResponseEntity.ok(java.util.Map.of(
+                "message", "Tournament prediction lock time set to: " + parsedTime,
+                "tournamentPredictionLockTime", settings.getTournamentPredictionLockTime().toString()
+        ));
+    }
+
+    @PostMapping("/tournament-settings/lock-now")
+    public ResponseEntity<?> lockTournamentPredictions() {
+        tournamentSettingsService.lockNow();
+        return ResponseEntity.ok(java.util.Map.of("message", "Tournament predictions locked manually."));
+    }
+
+    @PostMapping("/tournament-settings/unlock")
+    public ResponseEntity<?> unlockTournamentPredictions() {
+        tournamentSettingsService.unlock();
+        return ResponseEntity.ok(java.util.Map.of("message", "Tournament predictions unlocked."));
     }
 }

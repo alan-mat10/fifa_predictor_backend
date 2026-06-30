@@ -27,9 +27,18 @@ public class Prediction {
     @JoinColumn(name = "match_id", nullable = false)
     private Match match;
 
-    private int predictedTeam1Score;
+    @Column(name = "predicted_team1_score")
+    private Integer predictedTeam1Score;
 
-    private int predictedTeam2Score;
+    @Column(name = "predicted_team2_score")
+    private Integer predictedTeam2Score;
+
+    /**
+     * For knockout matches: if user predicts a draw, they must pick which team wins on penalties.
+     * Null for group stage matches or non-draw predictions.
+     */
+    @Column(name = "penalty_winner_team_id")
+    private Long penaltyWinnerTeamId;
 
     @Builder.Default
     private int pointsEarned = 0;

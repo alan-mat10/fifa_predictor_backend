@@ -1,5 +1,6 @@
 package com.fifaworldcup.Fifa.controller;
 
+import com.fifaworldcup.Fifa.dto.GroupStandingsResponse;
 import com.fifaworldcup.Fifa.dto.MatchResponse;
 import com.fifaworldcup.Fifa.model.Match;
 import com.fifaworldcup.Fifa.repository.MatchGoalScorerRepository;
@@ -57,5 +58,15 @@ public class MatchController {
     @GetMapping("/group/{group}")
     public ResponseEntity<List<MatchResponse>> getByGroup(@PathVariable String group) {
         return ResponseEntity.ok(matchService.getMatchesByGroup(group));
+    }
+
+    @GetMapping("/standings")
+    public ResponseEntity<Map<String, List<GroupStandingsResponse>>> getAllStandings() {
+        return ResponseEntity.ok(matchService.computeAllStandings());
+    }
+
+    @GetMapping("/standings/{group}")
+    public ResponseEntity<List<GroupStandingsResponse>> getStandingsByGroup(@PathVariable String group) {
+        return ResponseEntity.ok(matchService.computeGroupStandings(group));
     }
 }
