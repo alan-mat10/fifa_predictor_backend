@@ -129,7 +129,7 @@ public class FootballDataService {
                         team2Score = homeScore;
                     }
 
-                    // For knockout matches decided by penalties, give +1 to winner for advancement
+                    // For knockout matches decided by penalties, store penalty scores for display
                     String duration = score.get("duration") != null ? (String) score.get("duration") : "REGULAR";
                     if ("PENALTY_SHOOTOUT".equals(duration) && match.getStage() != Match.Stage.GROUP) {
                         @SuppressWarnings("unchecked")
@@ -139,20 +139,14 @@ public class FootballDataService {
                             int penAway = ((Number) penalties.get("away")).intValue();
                             int penTeam1 = normalOrder ? penHome : penAway;
                             int penTeam2 = normalOrder ? penAway : penHome;
-                            // Store penalty scores for UI display
+                            // Store penalty scores for UI display and advancement logic
                             match.setTeam1PenaltyScore(penTeam1);
                             match.setTeam2PenaltyScore(penTeam2);
-                            // Give +1 to the penalty winner so advanceWinner can determine the winner
-                            if (penTeam1 > penTeam2) {
-                                team1Score = team1Score + 1;
-                            } else if (penTeam2 > penTeam1) {
-                                team2Score = team2Score + 1;
-                            }
                             log.info("   Penalty shootout: {} ({}) - ({}) {}", team1Name, penTeam1, penTeam2, team2Name);
                         }
                     }
 
-                    // Update match result
+                    // Update match result — store the REAL score (no +1 hack)
                     match.setTeam1Score(team1Score);
                     match.setTeam2Score(team2Score);
                     match.setStatus(Match.MatchStatus.COMPLETED);

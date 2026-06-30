@@ -28,7 +28,7 @@ public class ScoreCorrectionJob implements CommandLineRunner {
     private final MatchRepository matchRepository;
     private final FootballDataService footballDataService;
 
-    @Value("${app.correct-r32-scores:true}")
+    @Value("${app.correct-r32-scores:false}")
     private boolean correctR32Scores;
 
     @Override

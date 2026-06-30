@@ -39,13 +39,23 @@ public class KnockoutAdvancementService {
 
     /**
      * Determines the winner of a match based on scores.
-     * Returns team1 if team1Score > team2Score, team2 if team2Score > team1Score, null if draw.
+     * Returns team1 if team1Score > team2Score, team2 if team2Score > team1Score.
+     * If scores are equal (draw after extra time), checks penalty scores.
+     * Returns null only if no winner can be determined.
      */
     public Team determineWinner(Match match) {
         if (match.getTeam1Score() > match.getTeam2Score()) {
             return match.getTeam1();
         } else if (match.getTeam2Score() > match.getTeam1Score()) {
             return match.getTeam2();
+        }
+        // Scores are equal — check penalty shootout scores
+        if (match.getTeam1PenaltyScore() != null && match.getTeam2PenaltyScore() != null) {
+            if (match.getTeam1PenaltyScore() > match.getTeam2PenaltyScore()) {
+                return match.getTeam1();
+            } else if (match.getTeam2PenaltyScore() > match.getTeam1PenaltyScore()) {
+                return match.getTeam2();
+            }
         }
         return null;
     }
