@@ -259,19 +259,27 @@ public class FootballDataService {
 
             if (actualGoals > 0) {
                 int predictedGoals = prediction.getPredictedGoals();
-                int goalsToReward = Math.min(actualGoals, predictedGoals);
-                points = GOAL_SCORER_POINTS * goalsToReward;
+                int correctGoals = Math.min(actualGoals, predictedGoals);
+                int wrongGoals = predictedGoals - correctGoals;
+                points = (GOAL_SCORER_POINTS * correctGoals) - (GOAL_SCORER_POINTS * wrongGoals);
+            } else {
+                // Player didn't score at all — deduct for each predicted goal
+                int predictedGoals = prediction.getPredictedGoals();
+                points = -(GOAL_SCORER_POINTS * predictedGoals);
             }
 
             prediction.setPointsEarned(points);
             prediction.setScored(true);
             goalScorerPredictionRepository.save(prediction);
 
-            if (points > 0) {
+            if (points != 0) {
                 User user = prediction.getUser();
                 user.setTotalPoints(user.getTotalPoints() + points);
                 userRepository.save(user);
-                log.info("   +{} pts to {} (predicted: {})", points, user.getUsername(), prediction.getPlayer().getName());
+                log.info("   {} pts to {} (predicted: {} x{}, actual: {})",
+                        points > 0 ? "+" + points : points,
+                        user.getUsername(), prediction.getPlayer().getName(),
+                        prediction.getPredictedGoals(), actualGoals);
             }
         }
     }
@@ -297,6 +305,23 @@ public class FootballDataService {
                 // Exact score bonus
                 if (predictedTeam1 == actualTeam1 && predictedTeam2 == actualTeam2) {
                     points += EXACT_SCORE_POINTS;  // +2 for exact score (total +3)
+                }
+            }
+
+            // Knockout penalty winner bonus: +1 if user correctly predicted penalty winner
+            if (match.getStage() != Match.Stage.GROUP
+                    && actualTeam1 == actualTeam2
+                    && match.getTeam1PenaltyScore() != null
+                    && prediction.getPenaltyWinnerTeamId() != null) {
+                // Determine actual penalty winner team ID
+                Long actualPenWinnerTeamId = null;
+                if (match.getTeam1PenaltyScore() > match.getTeam2PenaltyScore()) {
+                    actualPenWinnerTeamId = match.getTeam1().getId();
+                } else if (match.getTeam2PenaltyScore() > match.getTeam1PenaltyScore()) {
+                    actualPenWinnerTeamId = match.getTeam2().getId();
+                }
+                if (actualPenWinnerTeamId != null && actualPenWinnerTeamId.equals(prediction.getPenaltyWinnerTeamId())) {
+                    points += MATCH_WINNER_POINTS;  // +1 for correct penalty winner
                 }
             }
 

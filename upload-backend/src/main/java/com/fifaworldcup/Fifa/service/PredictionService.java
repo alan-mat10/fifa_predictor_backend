@@ -47,6 +47,7 @@ public class PredictionService {
 
         prediction.setPredictedTeam1Score(request.getPredictedTeam1Score());
         prediction.setPredictedTeam2Score(request.getPredictedTeam2Score());
+        prediction.setPenaltyWinnerTeamId(request.getPenaltyWinnerTeamId());
         prediction.setUpdatedAt(LocalDateTime.now());
 
         predictionRepository.save(prediction);
@@ -274,6 +275,7 @@ public class PredictionService {
                 .team2Flag(prediction.getMatch().getTeam2().getFlagUrl())
                 .predictedTeam1Score(prediction.getPredictedTeam1Score())
                 .predictedTeam2Score(prediction.getPredictedTeam2Score())
+                .penaltyWinnerTeamId(prediction.getPenaltyWinnerTeamId())
                 .actualTeam1Score(prediction.getMatch().getTeam1Score())
                 .actualTeam2Score(prediction.getMatch().getTeam2Score())
                 .pointsEarned(prediction.getPointsEarned())

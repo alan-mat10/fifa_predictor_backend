@@ -14,4 +14,9 @@ public class PredictionRequest {
 
     @Min(0)
     private int predictedTeam2Score;
+
+    /**
+     * For knockout matches: team ID of predicted penalty winner (required when scores are equal).
+     */
+    private Long penaltyWinnerTeamId;
 }
