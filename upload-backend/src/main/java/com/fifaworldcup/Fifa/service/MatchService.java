@@ -158,6 +158,8 @@ public class MatchService {
                 .group(match.getGroup())
                 .team1Score(match.getTeam1Score())
                 .team2Score(match.getTeam2Score())
+                .team1PenaltyScore(match.getTeam1PenaltyScore())
+                .team2PenaltyScore(match.getTeam2PenaltyScore())
                 .status(match.getStatus().name())
                 .predictionLocked(matchTimeIST.isBefore(LocalDateTime.now(IST)))
                 .build();

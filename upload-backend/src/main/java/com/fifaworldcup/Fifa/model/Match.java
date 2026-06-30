@@ -39,6 +39,10 @@ public class Match {
 
     private Integer team2Score;  // actual score (null until match ends)
 
+    private Integer team1PenaltyScore;  // penalty shootout score (null if no shootout)
+
+    private Integer team2PenaltyScore;  // penalty shootout score (null if no shootout)
+
     private String manOfTheMatch;  // MOTM player name (set by admin after match)
 
     @Builder.Default

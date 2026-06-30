@@ -17,6 +17,7 @@ import java.util.List;
 public class PredictionController {
 
     private final PredictionService predictionService;
+    private final com.fifaworldcup.Fifa.service.TournamentSettingsService tournamentSettingsService;
 
     // === Score Predictions ===
 
@@ -69,6 +70,9 @@ public class PredictionController {
     public ResponseEntity<String> predictTopScorer(
             @AuthenticationPrincipal UserDetails userDetails,
             @Valid @RequestBody SpecialPredictionRequest request) {
+        if (tournamentSettingsService.areTournamentPredictionsLocked()) {
+            return ResponseEntity.badRequest().body("Tournament predictions are locked.");
+        }
         predictionService.predictTopScorer(userDetails.getUsername(), request);
         return ResponseEntity.ok("Top scorer prediction saved");
     }
@@ -77,6 +81,9 @@ public class PredictionController {
     public ResponseEntity<String> predictGoldenBall(
             @AuthenticationPrincipal UserDetails userDetails,
             @Valid @RequestBody SpecialPredictionRequest request) {
+        if (tournamentSettingsService.areTournamentPredictionsLocked()) {
+            return ResponseEntity.badRequest().body("Tournament predictions are locked.");
+        }
         predictionService.predictGoldenBall(userDetails.getUsername(), request);
         return ResponseEntity.ok("Golden Ball prediction saved");
     }
@@ -85,6 +92,9 @@ public class PredictionController {
     public ResponseEntity<String> predictGoldenGlove(
             @AuthenticationPrincipal UserDetails userDetails,
             @Valid @RequestBody SpecialPredictionRequest request) {
+        if (tournamentSettingsService.areTournamentPredictionsLocked()) {
+            return ResponseEntity.badRequest().body("Tournament predictions are locked.");
+        }
         predictionService.predictGoldenGlove(userDetails.getUsername(), request);
         return ResponseEntity.ok("Golden Glove prediction saved");
     }
@@ -114,7 +124,19 @@ public class PredictionController {
     public ResponseEntity<String> predictWorldCupWinner(
             @AuthenticationPrincipal UserDetails userDetails,
             @RequestParam Long teamId) {
+        if (tournamentSettingsService.areTournamentPredictionsLocked()) {
+            return ResponseEntity.badRequest().body("Tournament predictions are locked.");
+        }
         predictionService.predictWorldCupWinner(userDetails.getUsername(), teamId);
         return ResponseEntity.ok("World Cup Winner prediction saved");
+    }
+
+    @GetMapping("/tournament-lock-status")
+    public ResponseEntity<java.util.Map<String, Object>> getTournamentLockStatus() {
+        var settings = tournamentSettingsService.getSettings();
+        return ResponseEntity.ok(java.util.Map.of(
+                "locked", tournamentSettingsService.areTournamentPredictionsLocked(),
+                "lockTime", settings.getTournamentPredictionLockTime() != null ? settings.getTournamentPredictionLockTime().toString() : ""
+        ));
     }
 }

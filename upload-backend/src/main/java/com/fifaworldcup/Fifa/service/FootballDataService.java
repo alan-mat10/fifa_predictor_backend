@@ -91,22 +91,70 @@ public class FootballDataService {
 
                 log.debug("  API match: '{}' ({}) vs '{}' ({})", apiHome, apiHomeShort, apiAway, apiAwayShort);
 
-                boolean homeMatch = teamsMatch(team1Name, apiHome) || teamsMatch(team1Name, apiHomeShort);
-                boolean awayMatch = teamsMatch(team2Name, apiAway) || teamsMatch(team2Name, apiAwayShort);
+                // Check both orderings: team1=home,team2=away OR team1=away,team2=home
+                boolean team1IsHome = teamsMatch(team1Name, apiHome) || teamsMatch(team1Name, apiHomeShort);
+                boolean team2IsAway = teamsMatch(team2Name, apiAway) || teamsMatch(team2Name, apiAwayShort);
+                boolean team1IsAway = teamsMatch(team1Name, apiAway) || teamsMatch(team1Name, apiAwayShort);
+                boolean team2IsHome = teamsMatch(team2Name, apiHome) || teamsMatch(team2Name, apiHomeShort);
 
-                if (homeMatch && awayMatch) {
+                boolean normalOrder = team1IsHome && team2IsAway;
+                boolean reversedOrder = team1IsAway && team2IsHome;
+
+                if (normalOrder || reversedOrder) {
                     // Found our match — extract score
                     @SuppressWarnings("unchecked")
                     Map<String, Object> score = (Map<String, Object>) apiMatch.get("score");
+
+                    // Use regularTime if available (score after 90 min), fallback to fullTime
+                    @SuppressWarnings("unchecked")
+                    Map<String, Object> regularTime = (Map<String, Object>) score.get("regularTime");
                     @SuppressWarnings("unchecked")
                     Map<String, Object> fullTime = (Map<String, Object>) score.get("fullTime");
 
-                    int homeScore = ((Number) fullTime.get("home")).intValue();
-                    int awayScore = ((Number) fullTime.get("away")).intValue();
+                    // For display, prefer regularTime (actual goals without penalties)
+                    Map<String, Object> displayScore = (regularTime != null && regularTime.get("home") != null)
+                            ? regularTime : fullTime;
+
+                    int homeScore = ((Number) displayScore.get("home")).intValue();
+                    int awayScore = ((Number) displayScore.get("away")).intValue();
+
+                    // Map API home/away to our team1/team2 based on order
+                    int team1Score, team2Score;
+                    if (normalOrder) {
+                        team1Score = homeScore;
+                        team2Score = awayScore;
+                    } else {
+                        // Reversed: team1 is the away team in the API
+                        team1Score = awayScore;
+                        team2Score = homeScore;
+                    }
+
+                    // For knockout matches decided by penalties, give +1 to winner for advancement
+                    String duration = score.get("duration") != null ? (String) score.get("duration") : "REGULAR";
+                    if ("PENALTY_SHOOTOUT".equals(duration) && match.getStage() != Match.Stage.GROUP) {
+                        @SuppressWarnings("unchecked")
+                        Map<String, Object> penalties = (Map<String, Object>) score.get("penalties");
+                        if (penalties != null && penalties.get("home") != null && penalties.get("away") != null) {
+                            int penHome = ((Number) penalties.get("home")).intValue();
+                            int penAway = ((Number) penalties.get("away")).intValue();
+                            int penTeam1 = normalOrder ? penHome : penAway;
+                            int penTeam2 = normalOrder ? penAway : penHome;
+                            // Store penalty scores for UI display
+                            match.setTeam1PenaltyScore(penTeam1);
+                            match.setTeam2PenaltyScore(penTeam2);
+                            // Give +1 to the penalty winner so advanceWinner can determine the winner
+                            if (penTeam1 > penTeam2) {
+                                team1Score = team1Score + 1;
+                            } else if (penTeam2 > penTeam1) {
+                                team2Score = team2Score + 1;
+                            }
+                            log.info("   Penalty shootout: {} ({}) - ({}) {}", team1Name, penTeam1, penTeam2, team2Name);
+                        }
+                    }
 
                     // Update match result
-                    match.setTeam1Score(homeScore);
-                    match.setTeam2Score(awayScore);
+                    match.setTeam1Score(team1Score);
+                    match.setTeam2Score(team2Score);
                     match.setStatus(Match.MatchStatus.COMPLETED);
                     matchRepository.save(match);
 
