@@ -28,6 +28,13 @@ public class ApiFootballService {
     @Value("${app.api-football.key:}")
     private String apiKey;
 
+    // Fallback: if no env var set, use this hardcoded key (set your key here for prod)
+    private String getApiKey() {
+        if (apiKey != null && !apiKey.isBlank()) return apiKey;
+        // TODO: Replace with your api-football.com key
+        return "e268e602805bf9fbc720ad5d4b7193b6";
+    }
+
     private static final String BASE_URL = "https://v3.football.api-sports.io";
     private static final int WORLD_CUP_LEAGUE_ID = 1;
     private static final int WORLD_CUP_SEASON = 2026;
@@ -38,7 +45,7 @@ public class ApiFootballService {
      * Does NOT save to DB — caller decides what to do with the data.
      */
     public List<Map<String, Object>> fetchGoalScorersFromApi(Match match) {
-        if (apiKey == null || apiKey.isBlank()) {
+        if (getApiKey().isBlank()) {
             log.warn("API-Football key not configured. Cannot fetch goal scorers.");
             return List.of();
         }
@@ -183,7 +190,7 @@ public class ApiFootballService {
     private Map<String, Object> callApi(String endpoint) {
         RestTemplate restTemplate = new RestTemplate();
         HttpHeaders headers = new HttpHeaders();
-        headers.set("x-apisports-key", apiKey);
+        headers.set("x-apisports-key", getApiKey());
         HttpEntity<Void> entity = new HttpEntity<>(headers);
 
         ResponseEntity<Map<String, Object>> response = restTemplate.exchange(
