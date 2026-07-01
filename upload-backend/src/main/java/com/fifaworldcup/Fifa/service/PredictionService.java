@@ -335,6 +335,41 @@ public class PredictionService {
         motmPredictionRepository.save(prediction);
     }
 
+    public java.util.Map<String, Object> getMyMotmPrediction(String username, Long matchId) {
+        User user = userRepository.findByUsername(username)
+                .orElseThrow(() -> new RuntimeException("User not found"));
+        Match match = matchRepository.findById(matchId)
+                .orElseThrow(() -> new RuntimeException("Match not found"));
+
+        java.util.Map<String, Object> result = new java.util.LinkedHashMap<>();
+        motmPredictionRepository.findByUserAndMatch(user, match).ifPresent(p -> {
+            result.put("playerId", p.getPlayer().getId());
+            result.put("playerName", p.getPlayer().getName());
+            result.put("playerTeam", p.getPlayer().getTeam().getName());
+        });
+        return result;
+    }
+
+    public List<java.util.Map<String, Object>> getAllMyMotmPredictions(String username) {
+        User user = userRepository.findByUsername(username)
+                .orElseThrow(() -> new RuntimeException("User not found"));
+
+        List<MotmPrediction> preds = motmPredictionRepository.findByUser(user);
+        List<java.util.Map<String, Object>> result = new java.util.ArrayList<>();
+        for (MotmPrediction p : preds) {
+            java.util.Map<String, Object> m = new java.util.LinkedHashMap<>();
+            m.put("matchId", p.getMatch().getId());
+            m.put("match", p.getMatch().getTeam1().getName() + " vs " + p.getMatch().getTeam2().getName());
+            m.put("playerId", p.getPlayer().getId());
+            m.put("playerName", p.getPlayer().getName());
+            m.put("playerTeam", p.getPlayer().getTeam().getName());
+            m.put("pointsEarned", p.getPointsEarned());
+            m.put("scored", p.isScored());
+            result.add(m);
+        }
+        return result;
+    }
+
     // ─── World Cup Winner Prediction ──────────────────────
 
     // World Cup Winner lock is now handled by TournamentSettingsService in the controller layer.

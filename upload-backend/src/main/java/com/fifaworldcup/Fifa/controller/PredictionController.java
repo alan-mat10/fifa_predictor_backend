@@ -120,6 +120,19 @@ public class PredictionController {
         return ResponseEntity.ok(predictionService.getMotmPredictionsForMatch(matchId));
     }
 
+    @GetMapping("/motm/my/{matchId}")
+    public ResponseEntity<java.util.Map<String, Object>> getMyMotmPrediction(
+            @AuthenticationPrincipal UserDetails userDetails,
+            @PathVariable Long matchId) {
+        return ResponseEntity.ok(predictionService.getMyMotmPrediction(userDetails.getUsername(), matchId));
+    }
+
+    @GetMapping("/motm/my-all")
+    public ResponseEntity<List<java.util.Map<String, Object>>> getAllMyMotmPredictions(
+            @AuthenticationPrincipal UserDetails userDetails) {
+        return ResponseEntity.ok(predictionService.getAllMyMotmPredictions(userDetails.getUsername()));
+    }
+
     @PostMapping("/world-cup-winner")
     public ResponseEntity<String> predictWorldCupWinner(
             @AuthenticationPrincipal UserDetails userDetails,
