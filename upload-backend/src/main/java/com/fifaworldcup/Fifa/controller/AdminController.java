@@ -38,6 +38,8 @@ public class AdminController {
     private final WorldCupWinnerPredictionRepository worldCupWinnerPredictionRepository;
     private final UserRepository userRepository;
     private final com.fifaworldcup.Fifa.service.TournamentSettingsService tournamentSettingsService;
+    private final com.fifaworldcup.Fifa.service.ApiFootballService apiFootballService;
+    private final com.fifaworldcup.Fifa.repository.MatchGoalScorerRepository matchGoalScorerRepository;
 
     private static final int TOP_SCORER_BONUS = 4;
     private static final int GOLDEN_BALL_BONUS = 4;
@@ -119,6 +121,49 @@ public class AdminController {
     public ResponseEntity<String> submitMatchGoalScorers(@Valid @RequestBody MatchGoalScorersRequest request) {
         adminService.submitMatchGoalScorers(request);
         return ResponseEntity.ok("Goal scorer points calculated");
+    }
+
+    /**
+     * Fetches goal scorers from API-Football for a match (preview only, doesn't save).
+     */
+    @GetMapping("/match-goal-scorers/fetch/{matchId}")
+    public ResponseEntity<List<java.util.Map<String, Object>>> fetchGoalScorersFromApi(@PathVariable Long matchId) {
+        Match match = matchRepository.findById(matchId)
+                .orElseThrow(() -> new RuntimeException("Match not found"));
+        List<java.util.Map<String, Object>> scorers = apiFootballService.fetchGoalScorersFromApi(match);
+        return ResponseEntity.ok(scorers);
+    }
+
+    /**
+     * Saves (or updates) goal scorers for a match. Replaces existing data.
+     * Accepts a list of scorer objects: [{playerName, minute, ownGoal, penalty}]
+     */
+    @PostMapping("/match-goal-scorers/save/{matchId}")
+    public ResponseEntity<String> saveMatchGoalScorers(
+            @PathVariable Long matchId,
+            @RequestBody List<java.util.Map<String, Object>> scorers) {
+        Match match = matchRepository.findById(matchId)
+                .orElseThrow(() -> new RuntimeException("Match not found"));
+        apiFootballService.saveGoalScorers(match, scorers);
+        return ResponseEntity.ok("Goal scorers saved for " + match.getTeam1().getName() + " vs " + match.getTeam2().getName());
+    }
+
+    /**
+     * Gets existing goal scorers for a match (for editing in admin).
+     */
+    @GetMapping("/match-goal-scorers/{matchId}")
+    public ResponseEntity<List<java.util.Map<String, Object>>> getMatchGoalScorers(@PathVariable Long matchId) {
+        var scorers = matchGoalScorerRepository.findByMatchId(matchId);
+        var result = scorers.stream().map(s -> {
+            java.util.Map<String, Object> map = new java.util.LinkedHashMap<>();
+            map.put("playerName", s.getPlayerName());
+            map.put("minute", s.getMinute());
+            map.put("ownGoal", s.isOwnGoal());
+            map.put("penalty", s.isPenalty());
+            map.put("firstGoal", s.isFirstGoal());
+            return map;
+        }).toList();
+        return ResponseEntity.ok(result);
     }
 
     @PostMapping("/submit-motm")
