@@ -91,18 +91,25 @@ public class LeaderboardService {
         // Goal scorer predictions breakdown
         List<GoalScorerPrediction> gsPredictions = goalScorerPredictionRepository.findByUser(user);
         int goalScorerPoints = 0;
-        int goalScorerCount = 0;
+        int goalScorerCorrectCount = 0;
+        int goalScorerWrongCount = 0;
         List<Map<String, Object>> gsDetails = new ArrayList<>();
 
         for (GoalScorerPrediction gs : gsPredictions) {
-            if (gs.getPointsEarned() > 0) {
+            if (gs.isScored()) {
                 Map<String, Object> detail = new LinkedHashMap<>();
                 detail.put("match", gs.getMatch().getTeam1().getName() + " vs " + gs.getMatch().getTeam2().getName());
                 detail.put("player", gs.getPlayer().getName());
+                detail.put("predictedGoals", gs.getPredictedGoals());
                 detail.put("points", gs.getPointsEarned());
+                detail.put("correct", gs.getPointsEarned() > 0);
                 gsDetails.add(detail);
                 goalScorerPoints += gs.getPointsEarned();
-                goalScorerCount++;
+                if (gs.getPointsEarned() > 0) {
+                    goalScorerCorrectCount++;
+                } else if (gs.getPointsEarned() < 0) {
+                    goalScorerWrongCount++;
+                }
             }
         }
 
@@ -176,7 +183,7 @@ public class LeaderboardService {
         Map<String, Object> summary = new LinkedHashMap<>();
         summary.put("matchResults", Map.of("points", matchResultPoints, "count", matchResultCount));
         summary.put("exactScores", Map.of("points", exactScorePoints, "count", exactScoreCount));
-        summary.put("goalScorers", Map.of("points", goalScorerPoints, "count", goalScorerCount));
+        summary.put("goalScorers", Map.of("points", goalScorerPoints, "correct", goalScorerCorrectCount, "wrong", goalScorerWrongCount));
         summary.put("motm", Map.of("points", motmPoints, "count", motmCount));
         summary.put("tournament", Map.of("points", tournamentPoints, "count", tournamentDetails.size()));
 
